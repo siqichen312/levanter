@@ -34,6 +34,13 @@ def num_cpus_used_by_tokenizer(tokenizer: HfTokenizer) -> int:
 
 
 def byte_length_of_token(tokenizer, idx: int) -> int:
+    # Handle PassthroughTokenizer specially since it expects pre-tokenized data
+    from levanter.data.passthrough_tokenizer import PassthroughTokenizer
+    if isinstance(tokenizer, PassthroughTokenizer):
+        # For PassthroughTokenizer, each token is just an integer, so we estimate 4 bytes per token
+        # This is a reasonable approximation for most use cases
+        return 4
+    
     # this is a pain because we want the prefix spaces, but we don't want extra noise for bytes
     # e.g. in llama
     # >>> t.convert_ids_to_tokens(q[2])

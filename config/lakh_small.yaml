@@ -1,14 +1,15 @@
 data:
   train_urls:
-      - "/user/s/siqichen/projects/anticipation/data/train.txt"
+    - "/user/s/siqichen/projects/amt/anticipation/data/train.txt"
   validation_urls:
-      - "/user/s/siqichen/projects/anticipation/data/valid.txt"
-  # cache_dir: "/user/s/siqichen/projects/anticipation/data/cache/"
-
+    - "/user/s/siqichen/projects/amt/anticipation/data/valid.txt"
+  
+  cache_dir: "/user/s/siqichen/projects/amt/anticipation/data/cache/"
+  
+  # Use passthrough tokenizer for pre-tokenized data
   tokenizer: "passthrough"
-  plaintext: True 
-  vocab_size: 55028  # This is required for passthrough tokenizer
-  enforce_eos: False
+  vocab_size: 55028  # Required for passthrough tokenizer
+  enforce_eos: false
 
 model:
   type: gpt2
@@ -25,7 +26,7 @@ trainer:
   train_batch_size: 512
 
   checkpointer:
-    base_path: "/user/s/siqichen/projects/anticipation/checkpoints/"
+    base_path: "/user/s/siqichen/projects/amt/anticipation/checkpoints/"
     save_interval: 30m
 
   axis_resources:

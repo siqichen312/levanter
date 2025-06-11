@@ -230,10 +230,18 @@ class BatchTokenizer(BatchProcessor[dict, dict]):
 
         # HF's BPE-based tokenizers do not, but the bert and roberta ones do
         # TODO: this doesn't necessarily ensure it, I guess, but eh
+        # Skip the test for PassthroughTokenizer since it expects pre-tokenized data
         if enforce_eos or enforce_bos:
-            input_ids = tokenizer("hi there")["input_ids"]
-            should_append_eos = input_ids[-1] != tokenizer.eos_token_id and enforce_eos
-            should_append_bos = input_ids[0] != tokenizer.bos_token_id and enforce_bos
+            # Check if this is a PassthroughTokenizer to avoid the "hi there" test
+            from levanter.data.passthrough_tokenizer import PassthroughTokenizer
+            if isinstance(tokenizer, PassthroughTokenizer):
+                # PassthroughTokenizer doesn't need EOS/BOS handling since data is pre-tokenized
+                should_append_eos = False
+                should_append_bos = False
+            else:
+                input_ids = tokenizer("hi there")["input_ids"]
+                should_append_eos = input_ids[-1] != tokenizer.eos_token_id and enforce_eos
+                should_append_bos = input_ids[0] != tokenizer.bos_token_id and enforce_bos
         else:
             should_append_eos = False
             should_append_bos = False
@@ -320,7 +328,13 @@ class BatchTokenizer(BatchProcessor[dict, dict]):
 
     @property
     def output_exemplar(self) -> dict:
-        return dict(**self.tokenizer("hi there", return_attention_mask=self.return_attention_mask, verbose=False))
+        # Handle PassthroughTokenizer which expects pre-tokenized data
+        from levanter.data.passthrough_tokenizer import PassthroughTokenizer
+        if isinstance(self.tokenizer, PassthroughTokenizer):
+            # Use a sample of space-separated integers for PassthroughTokenizer
+            return dict(**self.tokenizer("1 2 3 4 5", return_attention_mask=self.return_attention_mask, verbose=False))
+        else:
+            return dict(**self.tokenizer("hi there", return_attention_mask=self.return_attention_mask, verbose=False))
 
     @property
     def name_or_path(self):
@@ -496,7 +510,18 @@ class UrlDatasetSourceConfig(LmDatasetSourceConfigBase):
         if len(split_urls) == 0:
             return None
 
-        return UrlDataSource(split_urls)
+        # Check if any URLs are .txt files - if so, use TextUrlDataSource
+        # which has built-in support for .txt files
+        has_txt_files = any(url.endswith('.txt') or url.endswith('.txt.gz') or url.endswith('.txt.bz2') for url in split_urls)
+        
+        if has_txt_files:
+            # Use TextUrlDataSource for .txt files, which wraps each line in a dict with text_key
+            from levanter.data.sharded_datasource import TextUrlDataSource
+            text_source = TextUrlDataSource(split_urls, text_key="text")
+            # TextUrlDataSource returns strings, but we need dicts, so we map each string to {"text": string}
+            return text_source.map(lambda text_line: {"text": text_line.strip()})
+        else:
+            return UrlDataSource(split_urls)
 
     def urls_for_split(self, split):
         if split == "train":
@@ -850,8 +875,13 @@ def mk_single_turn_cached_sft_dataset(
     # Set up example structure matching supervised case
     output_exemplar = {"input_ids": np.zeros((0,), dtype=np.int32), "sources_len": np.zeros((0,), dtype=np.int32)}
 
-    input_ids = tokenizer("hi there")["input_ids"]
-    should_append_eos = input_ids[-1] != tokenizer.eos_token_id
+    # Skip the EOS test for PassthroughTokenizer since it expects pre-tokenized data
+    from levanter.data.passthrough_tokenizer import PassthroughTokenizer
+    if isinstance(tokenizer, PassthroughTokenizer):
+        should_append_eos = False
+    else:
+        input_ids = tokenizer("hi there")["input_ids"]
+        should_append_eos = input_ids[-1] != tokenizer.eos_token_id
     logger.info(f"Manual EOS Needed: {should_append_eos}")
 
     # Process the dataset
@@ -954,8 +984,13 @@ def mk_chat_sft_dataset(
     # Set up example structure matching supervised case
     output_exemplar = {"input_ids": np.zeros((0,), dtype=np.int32), "sources_len": np.zeros((0,), dtype=np.int32)}
 
-    input_ids = tokenizer("hi there")["input_ids"]
-    should_append_eos = input_ids[-1] != tokenizer.eos_token_id
+    # Skip the EOS test for PassthroughTokenizer since it expects pre-tokenized data
+    from levanter.data.passthrough_tokenizer import PassthroughTokenizer
+    if isinstance(tokenizer, PassthroughTokenizer):
+        should_append_eos = False
+    else:
+        input_ids = tokenizer("hi there")["input_ids"]
+        should_append_eos = input_ids[-1] != tokenizer.eos_token_id
     logger.info(f"Manual EOS Needed: {should_append_eos}")
 
     # Process the dataset
